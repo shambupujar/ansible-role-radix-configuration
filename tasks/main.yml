@@ -87,6 +87,7 @@
     state: directory
     owner: "{{ service_unix_user | default('root') }}"
     mode: '0755'
+  when: grafana_agent_configure | bool
 
 - name: Configure grafana-agent
   block:
@@ -124,6 +125,7 @@
 
   - name: "Flush handlers"
     meta: flush_handlers
+  when: grafana_agent_configure | bool
 
 - name: configure fail2ban
   block:

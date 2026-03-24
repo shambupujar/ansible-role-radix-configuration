@@ -12,6 +12,7 @@ loki_password: "secret"
 fail2ban_logs: "/var/log/fail2ban.log"
 
 ### grafana-agent vars
+grafana_agent_configure: true
 grafana_agent_scrape_interval: "15s"
 agent_integration_enabled: false
 node_exporter_enabled: true
