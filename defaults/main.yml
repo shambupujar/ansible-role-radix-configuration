@@ -1,0 +1,54 @@
+---
+### deployment mode: "systemd" or "docker"
+node_deployment_mode: "systemd"
+
+### promtail vars
+promtail_version: "v3.5.11"
+promtail_config_file: "promtail.yml"
+promtail_config_dir: "/etc/promtail"
+loki_url: "logs-prod-us-central1.grafana.net/loki/api/v1/push"
+loki_user: "user"
+loki_password: "secret"
+fail2ban_logs: "/var/log/fail2ban.log"
+
+### grafana-agent vars
+grafana_agent_scrape_interval: "15s"
+agent_integration_enabled: false
+node_exporter_enabled: true
+grafana_agent_config: "grafana-agent-config.yml.j2"
+# remote write endpoint (Grafana Cloud or Mimir)
+remote_write_url: ""
+remote_write_username: "user"
+remote_write_password: "dummy"
+# basic auth for scraping Radix API metrics
+metrics_username: "user"
+metrics_user_password: "dummy"
+# labels
+validator_or_fullnode_or_backup: ""
+network_name : ""
+NODE_NAME: ""
+ansible_host: ""
+agent_region: ""
+# api-metrics vars
+grafana_monitor_apimetrics: true
+api_metrics_host_name: localhost
+api_metrics_port_number: 8099
+api_metrics_path: "/prometheus/metrics"
+# cAdvisor vars
+grafana_monitor_cadvisor: false
+cadvisor_host_name: localhost
+cadvisor_port_name: 9900
+# jmx-vars
+grafana_monitor_jmx: false
+jmx_exporter_version: "0.16.1"
+jmx_metrics_host_name : localhost
+jmx_metrics_port_number: 4041
+
+### fail2ban vars
+fail2_ban_ip_ban_enabled: false
+fail2ban_action_dir: "/etc/fail2ban/action.d"
+fail2ban_filter_dir: "/etc/fail2ban/filter.d"
+fail2ban_cloudflare_action_conf_file: "cloudflare.conf"
+fail2ban_nginx_rate_limit_filter_conf_file: "nginx-badbots.conf"
+fail2ban_cloudflare_action_cftoken: ""
+fail2ban_cloudflare_action_cfuser: ""

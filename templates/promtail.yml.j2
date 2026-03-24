@@ -1,0 +1,158 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: https://{{loki_user}}:{{loki_password}}@{{loki_url}}
+    backoff_config:
+      min_period: 100ms
+      max_period: 10s
+      max_retries: 10
+
+scrape_configs: 
+  - job_name: fail2ban
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          app: security
+          tool: fail2ban
+          network: {{network_name}}
+          node: {{NODE_NAME}}
+          public_ip: {{ ansible_host }}
+          region: {{agent_region}}
+          __path__: {{fail2ban_logs}}
+
+  - job_name: dmesg
+    static_configs:
+      - targets: [localhost]
+        labels:
+          app: security
+          job: dmesg
+          network: {{network_name}}
+          node: {{NODE_NAME}}
+          public_ip: {{ ansible_host }}
+          region: {{agent_region}}
+          __path__: /var/log/dmesg
+
+  - job_name: syslog
+    static_configs:
+      - targets: [localhost]
+        labels:
+          app: security
+          job: syslog
+          network: {{network_name}}
+          node: {{NODE_NAME}}
+          public_ip: {{ ansible_host }}
+          region: {{agent_region}}
+          __path__: /var/log/syslog
+
+  - job_name: kernel-logs
+    static_configs:
+      - targets: [localhost]
+        labels:
+          app: security
+          job: kernel-logs
+          network: {{network_name}}
+          node: {{NODE_NAME}}
+          public_ip: {{ ansible_host }}
+          region: {{agent_region}}
+          __path__: /var/log/kern.log
+          
+{% if node_deployment_mode == "systemd" %}
+  - job_name: radixdlt-node
+    journal:
+      json: false
+      max_age: 12h
+      path: /var/log/journal
+      matches: _SYSTEMD_UNIT=radixdlt-node.service
+      labels:
+        job: radixdlt-node
+        app: {{ validator_or_fullnode_or_backup }}
+        network: {{network_name}}
+        node: {{NODE_NAME}}
+        public_ip: {{ ansible_host }}
+        region: {{agent_region}}
+
+  - job_name: nginx
+    journal:
+      json: false
+      max_age: 12h
+      path: /var/log/journal
+      matches: _SYSTEMD_UNIT=nginx.service
+      labels:
+        job: nginx
+        app: {{ validator_or_fullnode_or_backup }}
+        network: {{network_name}}
+        node: {{NODE_NAME}}
+        public_ip: {{ ansible_host }}
+        region: {{agent_region}}
+{% endif %}
+{% if node_deployment_mode == "docker" %}
+  - job_name: core_scrape
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+        - name: name
+          values: [core]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'source'
+      - source_labels: ['__meta_docker_container_label_logging_jobname']
+        target_label: 'job'
+      - target_label: network
+        replacement: {{network_name}}
+      - target_label: node
+        replacement: {{NODE_NAME}}
+      - target_label: public_ip
+        replacement: {{ ansible_host }}
+      - target_label: region
+        replacement: {{agent_region}}
+      - target_label: host
+        replacement: {{NODE_NAME}}
+      - target_label: compose_service
+        replacement: core
+      - target_label: compose_project
+        replacement: radixdlt
+      - target_label: app
+        replacement: {{ validator_or_fullnode_or_backup }}
+
+  - job_name: nginx_scrape
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+        - name: name
+          values: [nginx]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'source'
+      - source_labels: ['__meta_docker_container_label_logging_jobname']
+        target_label: 'job'
+      - target_label: network
+        replacement: {{network_name}}
+      - target_label: node
+        replacement: {{NODE_NAME}}
+      - target_label: public_ip
+        replacement: {{ ansible_host }}
+      - target_label: region
+        replacement: {{agent_region}}
+      - target_label: host
+        replacement: {{NODE_NAME}}
+      - target_label: compose_service
+        replacement: core
+      - target_label: compose_project
+        replacement: radixdlt
+      - target_label: app
+        replacement: {{ validator_or_fullnode_or_backup }}
+{% endif %}

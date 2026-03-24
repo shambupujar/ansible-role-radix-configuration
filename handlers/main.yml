@@ -1,0 +1,17 @@
+---
+- name: restart promtail
+  systemd:
+    name: promtail
+    state: restarted
+
+- name: restart grafana agent
+  service: 
+    name: grafana-agent
+    state: restarted
+    enabled: yes
+
+- name: restart fail2ban service
+  service:
+    name: fail2ban
+    state: restarted
+    enabled: yes

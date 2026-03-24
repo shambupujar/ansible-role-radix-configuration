@@ -1,0 +1,18 @@
+galaxy_info:
+  role_name: radix_configuration
+  author: shambupujar
+  description: Configures monitoring (Grafana Agent, Promtail, JMX) and security (fail2ban) for Radix nodes
+  license: MIT
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+  galaxy_tags:
+    - radix
+    - monitoring
+    - promtail
+    - fail2ban
+
+dependencies: []

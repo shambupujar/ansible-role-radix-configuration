@@ -1,0 +1,100 @@
+integrations:
+  agent:
+    enabled: {{agent_integration_enabled}}
+{% if node_exporter_enabled is true %}
+  node_exporter:
+    enabled: {{node_exporter_enabled}}
+    metric_relabel_configs:
+      - regex: 'agent_hostname|instance'
+        action: labeldrop
+      - source_labels: [__name__]
+        regex: "node_scrape_collector_duration_seconds|node_scrape_collector_success"
+        action: drop
+    filesystem_mount_points_exclude: "^/(dev|proc|sys|var/lib/docker/.+)($|/)"
+    filesystem_fs_types_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+  labels:
+    job: node_exporter
+    app: {{validator_or_fullnode_or_backup}}
+    network: {{network_name}}
+    node: {{NODE_NAME}}
+    public_ip: {{ansible_host}}
+    region: {{agent_region}}
+  prometheus_remote_write:
+    - url: {{remote_write_url}}
+      basic_auth:
+        username: {{remote_write_username}}
+        password: {{remote_write_password}}
+{% endif %}
+metrics:
+  wal_directory: /var/lib/grafana-agent/wal
+  global:
+    scrape_interval: {{grafana_agent_scrape_interval}}
+  configs:
+{% if grafana_monitor_apimetrics is true %}
+  - name: metrics-scrapper
+    host_filter: false
+    scrape_configs:
+      - job_name: 'api-metrics'
+        scheme: https
+        tls_config:
+            insecure_skip_verify: true
+        metrics_path: {{ api_metrics_path }}
+        static_configs:
+          - targets: ['{{api_metrics_host_name}}']
+            labels:
+              app: {{validator_or_fullnode_or_backup}}
+              network: {{network_name}}
+              node: {{NODE_NAME}}
+              public_ip: {{ansible_host}}
+              region: {{agent_region}}
+        metric_relabel_configs:
+          - regex: "version_accumulator"
+            action: labeldrop
+          - action: labeldrop  
+            regex: "leader_component_address"  
+        basic_auth:
+            username: {{metrics_username}}
+            password: {{metrics_user_password}}
+    remote_write:
+      - url: {{remote_write_url}}
+        basic_auth:
+          username: {{remote_write_username}}
+          password: {{remote_write_password}}
+{% endif %}
+{% if grafana_monitor_cadvisor is true %}
+  - name: exporter-scrapper
+    host_filter: false
+    scrape_configs:
+      - job_name: 'cadvisor'
+        scrape_interval: 5s
+        static_configs:
+        - targets: ['{{cadvisor_host_name}}:{{cadvisor_port_name}}']
+          labels:
+            nodename: {{ansible_host}}
+            job: {{network_name}}
+    remote_write:
+      - url: {{remote_write_url}}
+        basic_auth:
+          username: {{remote_write_username}}
+          password: {{remote_write_password}}
+{% endif %}
+{% if grafana_monitor_jmx is true %}
+  - name: jmx-scrapper
+    host_filter: false
+    scrape_configs:
+      - job_name: 'jmx-metrics'
+        metrics_path: /prometheus/metrics
+        static_configs:
+          - targets: ['{{jmx_metrics_host_name}}:{{jmx_metrics_port_number}}']
+            labels:
+              instance: {{ansible_host}}
+              node: {{NODE_NAME}}
+              network: {{network_name}}
+              app: {{validator_or_fullnode_or_backup}}
+              region: {{agent_region}}
+    remote_write:
+      - url: {{remote_write_url}}
+        basic_auth:
+          username: {{remote_write_username}}
+          password: {{remote_write_password}}
+{% endif %}

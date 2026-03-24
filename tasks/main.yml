@@ -1,0 +1,165 @@
+---
+- name: Check if promtail is installed
+  shell: /usr/bin/promtail --version
+  register: promtail_installed
+  changed_when: false
+  ignore_errors: true
+
+- name: Download promtail
+  get_url:
+    url: "https://github.com/grafana/loki/releases/download/{{ promtail_version }}/promtail-linux-amd64.zip"
+    dest: /tmp/promtail.zip
+    force: yes
+  when: promtail_installed is failed
+
+- name: Install promtail binary
+  shell: |
+    unzip -o /tmp/promtail.zip -d /tmp/promtail
+    mv /tmp/promtail/promtail-linux-amd64 /usr/bin/promtail
+    chmod +x /usr/bin/promtail
+    rm -rf /tmp/promtail /tmp/promtail.zip
+  when: promtail_installed is failed
+
+- name: Create promtail system user
+  user:
+    name: promtail
+    system: yes
+    create_home: no
+    shell: /usr/sbin/nologin
+    groups: adm
+    append: yes
+
+- name: adding existing user 'promtail' to group docker
+  user:
+    name: 'promtail'
+    groups: docker
+    append: yes
+  when: node_deployment_mode == "docker"
+
+- name: Create promtail config directory
+  file:
+    path: "{{ promtail_config_dir }}"
+    state: directory
+
+- name: Install promtail systemd service
+  copy:
+    dest: /etc/systemd/system/promtail.service
+    content: |
+      [Unit]
+      Description=Promtail service
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=promtail
+      ExecStart=/usr/bin/promtail -config.file {{ promtail_config_dir }}/{{ promtail_config_file }}
+      TimeoutSec=60
+      Restart=on-failure
+      RestartSec=2
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart promtail
+
+- name: promtail
+  template:
+    src: "{{ promtail_config_file | replace('.yml', '.yml.j2') }}"
+    dest: "{{ promtail_config_dir }}/{{ promtail_config_file }}"
+  notify: restart promtail
+
+- name: Enable and start promtail service
+  systemd:
+    enabled: true
+    name: promtail
+    state: started
+    daemon_reload: true
+
+- name: Ensure service user exists
+  user:
+    name: "{{ service_unix_user }}"
+    system: yes
+    create_home: yes
+  when: service_unix_user is defined
+
+- name: Create grafana-agent WAL directory
+  file:
+    path: /var/lib/grafana-agent/wal
+    state: directory
+    owner: "{{ service_unix_user | default('root') }}"
+    mode: '0755'
+
+- name: Configure grafana-agent
+  block:
+  - name: grafana agent - capture default agent-config file in variable
+    slurp:
+      src: /etc/grafana-agent/configs/agent_config_target.yml
+    register: agent_config
+
+  - set_fact: 
+      agent_config_in_yaml="{{ agent_config.content | b64decode | from_yaml }}"
+
+  - name: grafana agent - template out real grafana-agent config file
+    template:
+      src: "{{grafana_agent_config}}"
+      dest: "/etc/grafana-agent/configs/{{grafana_agent_config}}"
+
+  - name: grafana agent - fetch real agent-config file
+    slurp:
+      src: /etc/grafana-agent/configs/{{grafana_agent_config}}
+    register: result
+
+  - set_fact:
+      main_config_in_yaml="{{ result.content | b64decode | from_yaml }}"
+
+  - name: grafana agent - merge files
+    set_fact:
+      agent_config_in_yaml="{{ agent_config_in_yaml | combine(main_config_in_yaml,recursive=True) }}"
+
+  - name: grafana agent - copy grafana agent-config to dir
+    copy:
+      content: "{{ agent_config_in_yaml | to_nice_yaml }}" 
+      dest: /etc/grafana-agent/agent-config.yml
+    notify:
+        - restart grafana agent
+
+  - name: "Flush handlers"
+    meta: flush_handlers
+
+- name: configure fail2ban
+  block:
+  - name: fail2ban - cloudflare action configuration
+    template:
+      src: "{{ fail2ban_cloudflare_action_conf_file | replace('.conf', '.action.j2.conf') }}"
+      dest: "{{ fail2ban_action_dir }}/{{ fail2ban_cloudflare_action_conf_file }}"
+    notify: restart fail2ban service
+    when: fail2_ban_ip_ban_enabled | bool
+
+  - name: fail2ban - nginx rate limit ban filter configuration
+    template:
+      src: "{{ fail2ban_nginx_rate_limit_filter_conf_file|replace('.conf', '.filter.j2.conf')}}"
+      dest: "{{ fail2ban_filter_dir }}/{{ fail2ban_nginx_rate_limit_filter_conf_file }}"
+    notify: restart fail2ban service
+    when: fail2_ban_ip_ban_enabled | bool
+
+- name: JMX
+  block:
+  - name: JMX - create directory for jmx_exporter
+    file:
+      path: /etc/radixdlt/jmx_prometheus_javaagent
+      state: directory
+      owner: radix
+      group: radix
+      mode: '0755'
+
+  - name: JMX - copy jmx_exporter config file
+    template: 
+      src: "jmx-agent-config.yml"
+      dest: "/etc/radixdlt/jmx_prometheus_javaagent/config.yaml"
+      mode: 'a+r'
+
+  - name: JMX - download jmx_prometheus_exporter
+    get_url:
+      url: https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/{{ jmx_exporter_version }}/jmx_prometheus_javaagent-{{ jmx_exporter_version }}.jar
+      dest: /etc/radixdlt/jmx_prometheus_javaagent/
+      mode: "a+x"
+  when: grafana_monitor_jmx is defined and (grafana_monitor_jmx |  bool)
