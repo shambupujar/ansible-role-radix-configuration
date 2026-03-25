@@ -127,6 +127,52 @@
     meta: flush_handlers
   when: grafana_agent_configure | bool
 
+- name: Configure iptables firewall
+  block:
+  - name: iptables - install iptables-persistent
+    apt:
+      name:
+        - iptables
+        - iptables-persistent
+      state: present
+      update_cache: yes
+
+  - name: iptables - allow loopback traffic
+    iptables:
+      chain: INPUT
+      in_interface: lo
+      jump: ACCEPT
+
+  - name: iptables - allow established and related connections
+    iptables:
+      chain: INPUT
+      ctstate:
+        - ESTABLISHED
+        - RELATED
+      jump: ACCEPT
+
+  - name: iptables - allow inbound TCP ports
+    iptables:
+      chain: INPUT
+      protocol: tcp
+      destination_port: "{{ item }}"
+      jump: ACCEPT
+    loop: "{{ iptables_allowed_tcp_ports }}"
+
+  - name: iptables - drop all other inbound traffic
+    iptables:
+      chain: INPUT
+      policy: DROP
+
+  - name: iptables - allow all outbound traffic
+    iptables:
+      chain: OUTPUT
+      policy: ACCEPT
+
+  - name: iptables - save rules
+    shell: iptables-save > /etc/iptables/rules.v4
+  when: iptables_configure | bool
+
 - name: configure fail2ban
   block:
   - name: fail2ban - cloudflare action configuration

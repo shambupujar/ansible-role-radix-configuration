@@ -45,6 +45,13 @@ jmx_exporter_version: "0.16.1"
 jmx_metrics_host_name : localhost
 jmx_metrics_port_number: 4041
 
+### iptables firewall vars
+iptables_configure: false
+iptables_allowed_tcp_ports:
+  - 22
+  - 443
+  - 30000
+
 ### fail2ban vars
 fail2_ban_ip_ban_enabled: false
 fail2ban_action_dir: "/etc/fail2ban/action.d"
