@@ -7,6 +7,15 @@ positions:
 
 clients:
   - url: https://{{loki_user}}:{{loki_password}}@{{loki_url}}
+{% if loki_tenant_id is defined %}
+    tenant_id: {{ loki_tenant_id }}
+{% endif %}
+{% if loki_custom_headers is defined %}
+    headers:
+{% for key, value in loki_custom_headers.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
     backoff_config:
       min_period: 100ms
       max_period: 10s

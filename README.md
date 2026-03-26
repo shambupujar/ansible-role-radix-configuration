@@ -18,6 +18,8 @@ See [defaults/main.yml](defaults/main.yml) for the full list of variables.
 | `node_deployment_mode` | `systemd` | Deployment mode (`systemd` or `docker`) |
 | `promtail_version` | `v3.5.11` | Promtail version |
 | `loki_url` | (required) | Loki push endpoint |
+| `loki_tenant_id` | (optional) | Loki tenant ID for multi-tenant setups |
+| `loki_custom_headers` | (optional) | Dict of custom HTTP headers for Loki client |
 | `remote_write_url` | (required) | Prometheus remote write endpoint |
 | `grafana_agent_configure` | `true` | Enable Grafana Agent configuration (set `false` to skip if grafana-cloud-agent role is not used) |
 | `grafana_monitor_apimetrics` | `true` | Enable API metrics scraping |
